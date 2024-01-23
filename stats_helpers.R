@@ -52,7 +52,8 @@ plot_priors <- function(brmsfit_priorsonly, plot_params, trans = NULL, lowerboun
       prior_samples = prior_samples |> pull(plot_params[i]), 
       prior_name = plot_params[i], 
       trans = trans, 
-      lowerbound = lowerbound_i
+      lowerbound = lowerbound_i, 
+      xlims = xlims_i
     )
   }
   # Return either plot list or plots patched together in a single plot object
