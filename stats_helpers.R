@@ -40,7 +40,7 @@ plot_prior <- function(prior_samples, prior_name = NULL, trans = NULL, hdci_widt
   if (!is.null(xlims)) {p + scale_x_continuous(limits = xlims)} else {p}
 
 }
-plot_priors <- function(brmsfit_priorsonly, plot_params, trans = NULL, lowerbound = -Inf, xlims = NULL, patch_plots = FALSE, patch_ncol = 2) {
+plot_priors <- function(brmsfit_priorsonly, plot_params, trans = NULL, lowerbound = -Inf, patch_plots = FALSE, patch_ncol = 2) {
 
   plots <- list()
   prior_samples <- brmsfit_priorsonly |> as_tibble()
