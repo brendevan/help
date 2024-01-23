@@ -43,12 +43,11 @@ plot_priors <- function(brmsfit_priorsonly, plot_params, trans = NULL, lowerboun
   prior_samples <- brmsfit_priorsonly |> as_tibble()
 
   for (i in 1:length(plot_params)) {
-    if (is.null(trans)) {trans_i <- NULL} else {trans_i <- trans[i]}
     if (lowerbound == -Inf) {lowerbound_i <- -Inf} else {lowerbound_i <- lowerbound[i]}
     plots[[i]] <- plot_prior(
       prior_samples = prior_samples |> pull(plot_params[i]), 
       prior_name = plot_params[i], 
-      trans = trans_i, 
+      trans = trans, 
       lowerbound = lowerbound_i
     )
   }
