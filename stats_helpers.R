@@ -1,4 +1,4 @@
-plot_prior <- function(prior_samples, prior_name = NULL, trans = NULL, hdci_width = c(0.5, 0.89, 0.95), lowerbound = -Inf, cutoff_hdci = 0.999, max_kde_n = 1e6, min_kde_n = 1e3) {
+plot_prior <- function(prior_samples, prior_name = NULL, trans = NULL, hdci_width = c(0.5, 0.89, 0.95), lowerbound = -Inf, cutoff_hdci = 0.999, max_kde_n = 1e6, min_kde_n = 1e3, xlims = NULL) {
 
   # Apply transformation to prior samples 
   if (!is.null(trans)) {
@@ -31,11 +31,14 @@ plot_prior <- function(prior_samples, prior_name = NULL, trans = NULL, hdci_widt
     data_hdci <- rbind(data_hdci, data_hdci_i)
   }
   # Plot the prior samples distribution and shade HDCI intervals
-  ggplot2::ggplot() + 
+  p <- ggplot2::ggplot() + 
     ggplot2::geom_area(ggplot2::aes(x, y, fill = HDCI), data = data_hdci, position = "identity") + 
     ggplot2::labs(x = xlab, y = "Density") +
     ggplot2::geom_line(ggplot2::aes(x, y), data = data) + 
     ggplot2::scale_fill_manual(values = ggsci::pal_d3()(length(hdci_width)))
+
+  if (!is.null(xlims)) {p + scale_x_continuous(limits = xlims)} else {p}
+
 }
 plot_priors <- function(brmsfit_priorsonly, plot_params, trans = NULL, lowerbound = -Inf, patch_plots = FALSE, patch_ncol = 2) {
 
