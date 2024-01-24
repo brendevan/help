@@ -124,3 +124,68 @@ plot_prior_density <- function(
 
   return(p)
 }
+
+plot_prior_density2 <- function(
+  prior_samples,
+  hdci_width = c(0.5, 0.89, 0.95, 0.99),   # HDCI widths to plot
+  lowerbound = NULL,   # Lowerbound for density estimates, if not supplied cutoff_hdci is used
+  cutoff_hdci = 0.999, # Density is not estimated for prior values outside the cutoff_hdci HDCI e.g. 0.999 HDCI
+  max_kde_n = 1e6,     # Max number of grid cells at which to estimate the density
+  min_kde_n = 1e3,     # Min number of grid cells at which to estimate the density
+  subtitle_width = 60,  # Number of characters after which the subtitle is wrapped to the next line
+  adjust_margin = FALSE # Try to fix the top margin of the plot if subtitle is not fully shown
+) {
+  
+  # Exclude HDCI widths greater than the cutoff
+  hdci_width <- hdci_width[hdci_width <= cutoff_hdci]
+
+  # Get KDE to and from arguments as:
+  #    - from: if lowerbound is given, use lower bound; otherwise use cutoff_hdci
+  #    - to:   use cutoff_hdci
+  kde_cutoff <- ggdist::hdci(prior_samples, .width = cutoff_hdci)[2]
+  kde_from <- ifelse(is.null(lowerbound), 
+    floor(ggdist::hdci(prior_samples, .width = cutoff_hdci)[1]), 
+    lowerbound
+  )
+  # Get number of grid cells at which to estimate density
+  kde_n <- max(min(ceiling(kde_cutoff), max_kde_n), min_kde_n)
+  # Get kernel density estimate (KDE) of prior samples
+  dens <- density(prior_samples, n = kde_n, from = kde_from, to = kde_cutoff)
+  data <- data.frame(x = dens$x, y = dens$y)
+
+  # Get highest density continuous interval for each given width
+  # Note: this is not neccessarily the HDI if the prior samples distribution is multi-modal
+  data_hdci <- data.frame()
+  hdci_width <- sort(hdci_width, decreasing = TRUE) 
+  for (i in 1:length(hdci_width)) {
+    width_i <- hdci_width[i]
+    hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
+    data_hdci_i <- data |> 
+      dplyr::filter(x >= hdci_i[1] & x <= hdci_i[2]) |> 
+      dplyr::mutate(HDCI = width_i, HDCI = as.factor(HDCI))
+    data_hdci <- rbind(data_hdci, data_hdci_i)
+  }
+
+  # # Print HDCIs to console as dataframe
+  hdci_tbl <- data.frame()
+  for (i in 1:length(hdci_width)) {
+    width_i <- hdci_width[i]
+    hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
+    hdci_tbl_i <- data.frame(`HDCI width` = width_i, From = hdci_i[1], To = hdci_i[2])
+    hdci_tbl <- rbind(hdci_tbl, hdci_tbl_i)
+  }
+  print(hdci_tbl)
+
+  # Plot the prior samples distribution and shade HDCI intervals
+  p <- ggplot2::ggplot() + 
+    ggplot2::geom_area(ggplot2::aes(x, y, fill = HDCI), data = data_hdci, position = "identity") + 
+    ggplot2::geom_line(ggplot2::aes(x, y), data = data) + 
+    ggplot2::scale_fill_manual(values = ggsci::pal_d3()(length(hdci_width)))
+
+  p <- p + ggplot2::labs(
+    x = "Parameter (change this label)", 
+    y = "Density"
+  )  
+
+  return(p)
+}
