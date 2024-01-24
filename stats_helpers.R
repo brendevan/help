@@ -1,17 +1,57 @@
-plot_prior <- function(prior_samples, prior_name = NULL, trans = NULL, hdci_width = c(0.5, 0.89, 0.95), lowerbound = -Inf, cutoff_hdci = 0.999, max_kde_n = 1e6, min_kde_n = 1e3, xlims = NULL) {
+plot_prior_density <- function(
+  parameter_name,      # The name of the model parameter for which the prior pertains; used for plot title and labs
+  prior_distribution,  # the prior distribution e.g. "normal"
+  prior_args,          # arguments for the distribution e.g. list(mean = 0, sd = 1)
+  n_samples = 1e6,     # how many samples to draw from prior distribution to form density
+  trans = NULL,        # transformation to be applied to samples before plotting
+  hdci_width = c(0.5, 0.89, 0.95, 0.99),   # HDCI widths to plot
+  lowerbound = NULL,   # Lowerbound for density estimates, if not supplied cutoff_hdci is used
+  cutoff_hdci = 0.999, # Density is not estimated for prior values outside the cutoff_hdci HDCI e.g. 0.999 HDCI
+  max_kde_n = 1e6,     # Max number of grid cells at which to estimate the density
+  min_kde_n = 1e3,     # Min number of grid cells at which to estimate the density
+  subtitle_width = 60,  # Number of characters after which the subtitle is wrapped to the next line
+  adjust_margin = FALSE # Try to fix the top margin of the plot if subtitle is not fully shown
+) {
+
+  # Set values based on prior_distribution
+  dists <- list(
+    normal = "rnorm", 
+    gamma = "rgamma"
+  )
+  arg_strings <- c()
+  for (i in 1:length(prior_args)) {
+    name <- names(prior_args)[i]
+    value <- prior_args[[i]]
+    arg_strings[i] <- paste(name, "=", value)
+  }
+  dist_string <- paste0(parameter_name, " ~ ", stringr::str_to_title(prior_distribution), "(", paste(arg_strings, collapse = ", "), ")")
+
+  # Generate prior samples
+  if (prior_distribution %in% names(dists)) {
+    dist_func <- dists[[prior_distribution]]
+  } else {
+    stop(paste0("Unsupported prior_dsitribution. Supported distributions are: ", paste(names(dists), collapse = " ")))
+  }
+  prior_samples <- do.call(dist_func, args = append(list(n_samples), prior_args))
 
   # Apply transformation to prior samples 
   if (!is.null(trans)) {
-    xlab <- paste0(trans, ifelse(is.null(prior_name), "(prior)", paste0("(", prior_name, ")")))
+    xlab <- paste0(trans, "(", parameter_name, ")")
     prior_samples <- do.call(trans, list(prior_samples))
   } else {
-    xlab <- ifelse(is.null(prior_name), "(prior)", prior_name)
+    xlab <- parameter_name
   }
   
+  # Exclude HDCI widths greater than the cutoff
+  hdci_width <- hdci_width[hdci_width <= cutoff_hdci]
+
   # Find KDE cutoff value and lenght of x grid (n)
   kde_cutoff <- ggdist::hdci(prior_samples, .width = cutoff_hdci)[2]
   kde_n <- max(min(kde_cutoff, max_kde_n), min_kde_n)
-  kde_from <- ifelse(lowerbound == -Inf, floor(min(prior_samples)), lowerbound)
+  kde_from <- ifelse(is.null(lowerbound), 
+    floor(ggdist::hdci(prior_samples, .width = cutoff_hdci)[1]), 
+    lowerbound
+  )
   # Get kernel density estimate (KDE) of prior samples
   dens <- density(prior_samples, n = kde_n, from = kde_from, to = kde_cutoff)
 
@@ -30,32 +70,57 @@ plot_prior <- function(prior_samples, prior_name = NULL, trans = NULL, hdci_widt
       dplyr::mutate(HDCI = width_i, HDCI = as.factor(HDCI))
     data_hdci <- rbind(data_hdci, data_hdci_i)
   }
+
+  # Message HDCI intervals
+  hdci_tbl <- data.frame()
+  for (i in 1:length(hdci_width)) {
+    width_i <- hdci_width[i]
+    hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
+    hdci_tbl_i <- data.frame(`HDCI width` = width_i, From = hdci_i[1], To = hdci_i[2])
+    hdci_tbl <- rbind(hdci_tbl, hdci_tbl_i)
+  }
   # Plot the prior samples distribution and shade HDCI intervals
   p <- ggplot2::ggplot() + 
     ggplot2::geom_area(ggplot2::aes(x, y, fill = HDCI), data = data_hdci, position = "identity") + 
-    ggplot2::labs(x = xlab, y = "Density") +
     ggplot2::geom_line(ggplot2::aes(x, y), data = data) + 
     ggplot2::scale_fill_manual(values = ggsci::pal_d3()(length(hdci_width)))
 
-  if (!is.null(xlims)) {p + scale_x_continuous(limits = xlims)} else {p}
-
-}
-plot_priors <- function(brmsfit_priorsonly, plot_params, trans = NULL, lowerbound = -Inf, patch_plots = FALSE, patch_ncol = 2) {
-
-  plots <- list()
-  prior_samples <- brmsfit_priorsonly |> as_tibble()
-
-  for (i in 1:length(plot_params)) {
-    if (is.null(xlims)) {xlims_i <- NULL} else {xlims_i <- xlims[i]}
-    if (lowerbound == -Inf) {lowerbound_i <- -Inf} else {lowerbound_i <- lowerbound[i]}
-    plots[[i]] <- plot_prior(
-      prior_samples = prior_samples |> pull(plot_params[i]), 
-      prior_name = plot_params[i], 
-      trans = trans, 
-      lowerbound = lowerbound_i, 
-      xlims = xlims_i
-    )
+  # Add subtitle to plot
+  if (!is.null(trans)) {
+    trans_phrase <- paste0(trans, "-transformed ")
+    if (trans == "exp") trans_phrase <- "exponentiated "
+  } else {
+    trans_phrase <- ""
   }
-  # Return either plot list or plots patched together in a single plot object
-  if (patch_plots == TRUE) {patchwork::wrap_plots(plots, ncol = patch_ncol)} else {plots}
+  if (cutoff_hdci >= 1 & is.null(lowerbound)) {
+    subtitle_bounds <- ""
+  } else if (cutoff_hdci >= 1 & !is.null(lowerbound)) {
+    subtitle_bounds <- paste0("The density is estimated only for prior values greater than the lowerbound of ", lowerbound, ".")
+  } else if (cutoff_hdci < 1 & is.null(lowerbound)) {
+    subtitle_bounds <- paste0("The density is estimated only for prior values within the ", cutoff_hdci*100, "% HDCI.")
+  } else if (cutoff_hdci < 1 & !is.null(lowerbound)) {
+    subtitle_bounds <- paste0("The density is estimated only for prior values within the ", cutoff_hdci*100, "% HDCI and greater than the lowerbound of ", lowerbound, ".")
+  }
+  subtitle <- paste0(
+    "Density plot of ", formatC(length(prior_samples), format="d", big.mark=","), " ",
+    trans_phrase, "samples of ", parameter_name, " from the distribution ", dist_string,  
+    " along with Highest Continuous Density Intervals (HDCIs).", 
+    subtitle_bounds
+  )
+  p <- p + ggplot2::labs(
+    subtitle = stringr::str_wrap(subtitle, subtitle_width),
+    x = xlab, 
+    y = "Density"
+  )
+
+  # Adjust plot margins to account for wrapped subtitle
+  if (adjust_margin) {
+    subtitle_nlines <- ceiling(nchar(subtitle)/subtitle_width)
+    p <- p + ggplot2::theme(plot.margin = grid::unit(c(subtitle_nlines, 0, 0, 0), "lines"))
+  }
+  
+  # Print HDCIs to console as dataframe
+  print(hdci_tbl)
+
+  return(p)
 }
