@@ -132,8 +132,9 @@ plot_prior_density2 <- function(
   cutoff_hdci = 0.999, # Density is not estimated for prior values outside the cutoff_hdci HDCI e.g. 0.999 HDCI
   max_kde_n = 1e6,     # Max number of grid cells at which to estimate the density
   min_kde_n = 1e3,     # Min number of grid cells at which to estimate the density
-  subtitle_width = 60,  # Number of characters after which the subtitle is wrapped to the next line
-  adjust_margin = FALSE # Try to fix the top margin of the plot if subtitle is not fully shown
+  subtitle_width = 60, # Number of characters after which the subtitle is wrapped to the next line
+  adjust_margin = FALSE, # Try to fix the top margin of the plot if subtitle is not fully shown, 
+  print_hdci = TRUE    # Whether or not to print the table of HDCIs
 ) {
   
   # Exclude HDCI widths greater than the cutoff
@@ -167,14 +168,16 @@ plot_prior_density2 <- function(
   }
 
   # # Print HDCIs to console as dataframe
+  if (print_hdci) {
   hdci_tbl <- data.frame()
-  for (i in 1:length(hdci_width)) {
-    width_i <- hdci_width[i]
-    hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
-    hdci_tbl_i <- data.frame(`HDCI width` = width_i, From = hdci_i[1], To = hdci_i[2])
-    hdci_tbl <- rbind(hdci_tbl, hdci_tbl_i)
+    for (i in 1:length(hdci_width)) {
+      width_i <- hdci_width[i]
+      hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
+      hdci_tbl_i <- data.frame(`HDCI width` = width_i, From = hdci_i[1], To = hdci_i[2])
+      hdci_tbl <- rbind(hdci_tbl, hdci_tbl_i)
+    }
+    print(hdci_tbl)
   }
-  print(hdci_tbl)
 
   # Plot the prior samples distribution and shade HDCI intervals
   p <- ggplot2::ggplot() + 
