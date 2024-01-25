@@ -136,7 +136,13 @@ plot_prior_density2 <- function(
   adjust_margin = FALSE, # Try to fix the top margin of the plot if subtitle is not fully shown, 
   hdci_table = "no"    # Whether or not to print the table of HDCIs: "none", "print", "return"
 ) {
-  
+
+  require(ggplot2)
+  require(dplyr)
+  require(ggdist)
+  require(ggtext)
+  require(stringr)
+
   # Exclude HDCI widths greater than the cutoff
   hdci_width <- hdci_width[hdci_width <= cutoff_hdci]
 
@@ -156,6 +162,16 @@ plot_prior_density2 <- function(
 
   # Get highest density continuous interval for each given width
   # Note: this is not neccessarily the HDI if the prior samples distribution is multi-modal
+  digits <- function(x) nchar(as.character(x))
+  myround <- function(x) {
+    ifelse(x < 1 & x > -1, 
+      ifelse(digits(signif(x, 1)) - 2 > 5,  # if number of DPs greater than 5
+        round(x, 5),  # use 0.00000
+        signif(x, 1)  # otherwise express to 1 sigfig
+      ), 
+      round(x, 1)     # if not in (-1, 1) round to 1 DP
+    )
+  }
   data_hdci <- data.frame()
   hdci_width <- sort(hdci_width, decreasing = TRUE) 
   for (i in 1:length(hdci_width)) {
@@ -163,7 +179,10 @@ plot_prior_density2 <- function(
     hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
     data_hdci_i <- data |> 
       dplyr::filter(x >= hdci_i[1] & x <= hdci_i[2]) |> 
-      dplyr::mutate(HDCI = width_i, HDCI = as.factor(HDCI))
+      dplyr::mutate(
+        HDCI = paste0("**", width_i,"** [", myround(hdci_i[1]), ", ", myround(hdci_i[2]), "]"), 
+        HDCI = as.factor(HDCI)
+      )
     data_hdci <- rbind(data_hdci, data_hdci_i)
   }
 
@@ -200,11 +219,13 @@ plot_prior_density2 <- function(
     "Density plot of ", formatC(length(prior_samples), format="d", big.mark=","), " samples along with Highest Continuous Density Intervals (HDCIs).", 
     subtitle_bounds
   )
-  p <- p + ggplot2::labs(
-    subtitle = stringr::str_wrap(subtitle, subtitle_width),
-    x = "Parameter (change this label)", 
-    y = "Density"
-  )
+  p <- p + 
+    ggplot2::labs(
+      subtitle = stringr::str_wrap(subtitle, subtitle_width),
+      x = "Parameter (change this label)", 
+      y = "Density"
+    ) + 
+    theme(legend.text = ggtext::element_markdown())
 
   return(p)
 }
