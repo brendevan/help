@@ -134,7 +134,7 @@ plot_prior_density2 <- function(
   min_kde_n = 1e3,     # Min number of grid cells at which to estimate the density
   subtitle_width = 60, # Number of characters after which the subtitle is wrapped to the next line
   adjust_margin = FALSE, # Try to fix the top margin of the plot if subtitle is not fully shown, 
-  print_hdci = TRUE    # Whether or not to print the table of HDCIs
+  hdci_table = "no"    # Whether or not to print the table of HDCIs: "none", "print", "return"
 ) {
   
   # Exclude HDCI widths greater than the cutoff
@@ -167,28 +167,44 @@ plot_prior_density2 <- function(
     data_hdci <- rbind(data_hdci, data_hdci_i)
   }
 
-  # # Print HDCIs to console as dataframe
-  if (print_hdci) {
-  hdci_tbl <- data.frame()
+  # # HDCIs table (return or print if specified)
+  if (hdci_table != "no") {
+    hdci_tbl <- data.frame()
     for (i in 1:length(hdci_width)) {
       width_i <- hdci_width[i]
       hdci_i <- ggdist::hdci(prior_samples, .width = width_i)
       hdci_tbl_i <- data.frame(`HDCI width` = width_i, From = hdci_i[1], To = hdci_i[2])
       hdci_tbl <- rbind(hdci_tbl, hdci_tbl_i)
     }
-    print(hdci_tbl)
+    if (hdci_table == "print") print(hdci_tbl)
+    if (hdci_table == "return") return(hdci_table)
   }
-
+  
   # Plot the prior samples distribution and shade HDCI intervals
   p <- ggplot2::ggplot() + 
     ggplot2::geom_area(ggplot2::aes(x, y, fill = HDCI), data = data_hdci, position = "identity") + 
     ggplot2::geom_line(ggplot2::aes(x, y), data = data) + 
     ggplot2::scale_fill_manual(values = ggsci::pal_d3()(length(hdci_width)))
 
+  # Add subtitle to plot
+  if (cutoff_hdci >= 1 & is.null(lowerbound)) {
+    subtitle_bounds <- ""
+  } else if (cutoff_hdci >= 1 & !is.null(lowerbound)) {
+    subtitle_bounds <- paste0("The density is estimated only for values greater than the lowerbound of ", lowerbound, ".")
+  } else if (cutoff_hdci < 1 & is.null(lowerbound)) {
+    subtitle_bounds <- paste0("The density is estimated only for values within the ", cutoff_hdci*100, "% HDCI.")
+  } else if (cutoff_hdci < 1 & !is.null(lowerbound)) {
+    subtitle_bounds <- paste0("The density is estimated only for values within the ", cutoff_hdci*100, "% HDCI and greater than the lowerbound of ", lowerbound, ".")
+  }
+  subtitle <- paste0(
+    "Density plot of ", formatC(length(prior_samples), format="d", big.mark=","), " samples along with Highest Continuous Density Intervals (HDCIs).", 
+    subtitle_bounds
+  )
   p <- p + ggplot2::labs(
+    subtitle = stringr::str_wrap(subtitle, subtitle_width),
     x = "Parameter (change this label)", 
     y = "Density"
-  )  
+  )
 
   return(p)
 }
