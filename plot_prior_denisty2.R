@@ -8,7 +8,7 @@ plot_prior_density2 <- function(
   min_kde_n = 1e3,     # Min number of grid cells at which to estimate the density
   subtitle_width = 60, # Number of characters after which the subtitle is wrapped to the next line
   adjust_margin = FALSE, # Try to fix the top margin of the plot if subtitle is not fully shown, 
-  hdci_table = "print"    # Whether or not to print the table of HDCIs: "none", "print", "return"
+  hdci_table = "none"    # Whether or not to print the table of HDCIs: "none", "print", "return"
 ) {
 
   require(ggplot2)
