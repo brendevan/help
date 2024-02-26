@@ -15,6 +15,7 @@ plot_prior_density4 <- function(
   interval_widths = c(0.66, 0.97),
   interval_colors = c("#9ECAE1", "#3182BD"), 
   na_color = "#676769",
+  vline_color = "#c5b3cf",
   nsamples = 1e5, # Number of samples over which point_interval is calculated
   patched = TRUE, # Whether to patch plots together when multiple are produced
   subtitle_width = 60, # Number of characters after which the subtitle is wrapped to the next line
@@ -64,12 +65,19 @@ plot_prior_density4 <- function(
   if (!is.null(link)) {
     inv_link <- .inverse_link(link)
     prior_samples <- .backtransform(prior_samples, inv_link)
-    xlab <- ifelse(param == "sigma", 
-      paste0(inv_link, "(\\Delta)"), 
-      paste0(inv_link, "(\\", param, ")")
-    )
-    plots$backtransformed <- .plot_samples(prior_samples, ndots, point_interval, interval_widths, interval_colors, na_color) + 
-      labs(x = latex2exp::TeX(xlab))
+    
+    if (param == "sigma") {
+      xlab <- paste0(inv_link, "(\\Delta)")
+      vline_col <- vline_color
+    } else {
+      vline_col <- NULL
+      xlab <- paste0(inv_link, "(\\", param, ")")
+    }
+    plots$backtransformed <- .plot_samples(
+      prior_samples, ndots, point_interval, 
+      interval_widths, interval_colors, na_color, vline_color = vline_col
+    ) + 
+    labs(x = latex2exp::TeX(xlab)) 
     message(paste0("inverse link function applied [link: ", link, "; inverse link: ", inv_link), "]")
   }
   # =====> RETURN PLOTS
@@ -86,7 +94,7 @@ plot_prior_density4 <- function(
 # ==================================
 #         HELPER FUNCTIONS
 # ==================================
-.plot_samples <- function(samples, ndots, point_interval, interval_widths, interval_colors, na_color) {
+.plot_samples <- function(samples, ndots, point_interval, interval_widths, interval_colors, na_color, vline_color = NULL) {
 
   # NOTE: ggdist seems to be unreliable in its point calculations, e.g. 
   # set.seed(710); mode_hdci(exp(rnorm(1e5, 0, rexp(1e5, 2)))
@@ -104,10 +112,11 @@ plot_prior_density4 <- function(
 
   # PLOT STYLING
   gg_remove_yaxis <- theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
-
+  
   # CREATE PLOT
-  data.frame(x = samples) |> 
-    ggplot() + 
+  p <- data.frame(x = samples) |> ggplot()
+  if (!is.null(vline_color)) p <- p + geom_vline(xintercept = 1, linetype = "dotted", color = vline_color)
+  p <- p +
     stat_dots(
       aes(x, 
         slab_fill = after_stat(level), 
@@ -130,6 +139,8 @@ plot_prior_density4 <- function(
       slab_fill = "HDCI", slab_color = "HDCI"
     ) + 
     gg_remove_yaxis
+    
+  return(p)
 }
 .get_prior_samples <- function(prior_def, n_samples, seed, msg = FALSE) {
   synonyms <- list(
