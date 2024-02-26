@@ -16,7 +16,7 @@ plot_prior_density4 <- function(
   interval_colors = c("#9ECAE1", "#3182BD"), 
   na_color = "#676769",
   nsamples = 1e5, # Number of samples over which point_interval is calculated
-  patched = FALSE, # Whether to patch plots together when multiple are produced
+  patched = TRUE, # Whether to patch plots together when multiple are produced
   subtitle_width = 60, # Number of characters after which the subtitle is wrapped to the next line
   adjust_margin = FALSE, # Try to fix the top margin of the plot if subtitle is not fully shown, 
   seed = "random",       # Integer; if "random" (default) a random integer in [0, 1000] is used
