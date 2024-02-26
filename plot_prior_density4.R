@@ -9,7 +9,7 @@
 # ==================================
 plot_prior_density4 <- function(
   prior_def, # Prior distribution definition used to generate samples
-  link = NULL,  # Link function for paramater; if supplied, samples are backtransformed using the inverse link function
+  link = "identity",  # Link function for paramater; if supplied, samples are backtransformed using the inverse link function
   ndots = 100, # Number of dots to plot (sets ggdist::stat_dotsinterval quantiles argument)
   point_interval = "median_hdci",
   interval_widths = c(0.66, 0.97),
@@ -62,7 +62,7 @@ plot_prior_density4 <- function(
     message("sd prior converted to random intercept as RI ~ N(0, sd)")
   }
   # =====> BACKTRANSFORM TO RESPONSE SCALE?
-  if (!is.null(link)) {
+  if (link != "identity") {
     inv_link <- .inverse_link(link)
     prior_samples <- .backtransform(prior_samples, inv_link)
     
@@ -139,7 +139,7 @@ plot_prior_density4 <- function(
       slab_fill = "HDCI", slab_color = "HDCI"
     ) + 
     gg_remove_yaxis
-    
+
   return(p)
 }
 .get_prior_samples <- function(prior_def, n_samples, seed, msg = FALSE) {
