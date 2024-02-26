@@ -102,7 +102,10 @@ plot_prior_density4 <- function(
     warning(paste0("there was an error calculating", point_interval, "; using median_hdci instead.")) 
   }
 
-  # Prepare samples for plotting
+  # PLOT STYLING
+  gg_remove_yaxis <- theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+
+  # CREATE PLOT
   data.frame(x = samples) |> 
     ggplot() + 
     stat_dots(
@@ -125,7 +128,8 @@ plot_prior_density4 <- function(
       x = paste0("Prior samples (n =", ndots, ")"),
       y = "Density",
       slab_fill = "HDCI", slab_color = "HDCI"
-    )
+    ) + 
+    gg_remove_yaxis
 }
 .get_prior_samples <- function(prior_def, n_samples, seed, msg = FALSE) {
   synonyms <- list(
