@@ -147,7 +147,8 @@ plot_prior_density4 <- function(
     rnorm = c("normal", "gaussian", "N"), 
     rgamma = c("gamma"),
     rexp = c("exponential", "exp"), 
-    runif = c("uniform", "U", "unif")
+    runif = c("uniform", "U", "unif"), 
+    rpois = c("poisson")
   )
   prior_def <- str_split_1(prior_def, "~")[2] |> str_trim() # e.g. beta ~ N(0, 1) -> N(0, 1)
   distr <- prior_def |> 
