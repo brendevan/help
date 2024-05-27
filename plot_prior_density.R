@@ -8,15 +8,15 @@ plot_prior_density <- function(
   truncate_lower = NULL,
   link = "identity",    # Link function for paramater; if supplied, samples are backtransformed using the inverse link function
   type = c("density", "dots"), # Plot type
-  interval_widths = c(0.5, 0.85, 0.99),   # Interval widths to plot (HDCI for 'density'; defined by point_interval for 'dots')
-  interval_colors = c("#9ECAE1", "#3182BD", "#065085"), 
+  interval_widths = c(0.5, 0.86, 0.98),   # Interval widths to plot (HDCI for 'density'; defined by point_interval for 'dots')
+  interval_colors = NULL, 
   cutoff_hdci = 0.999,  # type == density: Density is not estimated for prior values outside the cutoff_hdci HDCI e.g. 0.999 HDCI
   max_kde_n = 1e6,      # type == density: Max number of grid cells at which to estimate the density
   min_kde_n = 1e3,      # type == density: Min number of grid cells at which to estimate the density
   hdci_table = "none",  # type == density: Whether or not to print the table of HDCIs: "none", "print", "return"
-  ndots = 100,          # type == dots: Number of dots to plot (sets ggdist::stat_dotsinterval quantiles argument)
+  quantiles = 100,          # type == dots: Number of dots to plot (sets ggdist::stat_dotsinterval quantiles argument)
   point_interval = "median_hdci", # type == dots: 
-  na_color = "#676769", # type == dots: 
+  na_color = "#676769", # type == dots: color of quantiles outside the given interval widths
   nsamples = 1e5,       # Number of samples over which density and HDCIs are calculated
   patched = TRUE,       # Whether to patch plots together when multiple are produced
   subtitle_width = 80,  # Number of characters after which the subtitle is wrapped to the next line
@@ -33,6 +33,7 @@ plot_prior_density <- function(
   require(patchwork)
   require(rlang)
   type <- rlang::arg_match(type)
+  if (is.null(interval_colors)) interval_colors <- ggokabeito::palette_okabe_ito()[1:length(interval_widths)]
 
   # Parse parameter name from prior def
   param <- .get_param_name(prior_def)
@@ -49,14 +50,14 @@ plot_prior_density <- function(
     prior_def |> str_split_1("~") |> str_replace("sd", "sigma") |> paste(collapse = "~"), 
     prior_def
   )
+  if (!is.null(truncate_lower)) title <- paste(title, "\\geq", truncate_lower)
   if (type == "density") {
-    p1 <- .plot_samples_density(prior_samples, interval_widths, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width = subtitle_width)
+    p1 <- .plot_samples_density(prior_samples, interval_widths, interval_colors, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width = subtitle_width)
   } 
   if (type == "dots") {
-    p1 <- .plot_samples_dots(prior_samples, ndots, point_interval, interval_widths, interval_colors, na_color, subtitle_width = subtitle_width)
+    p1 <- .plot_samples_dots(prior_samples, quantiles, point_interval, interval_widths, interval_colors, na_color, subtitle_width = subtitle_width)
   }
-  plots$prior <- p1 + labs(x = latex2exp::TeX(paste0("\\", param)), title = latex2exp::TeX(paste0("\\", title))
-  )
+  plots$prior <- p1 + labs(x = latex2exp::TeX(paste0("\\", param)), title = latex2exp::TeX(paste0("\\", title)))
 
   # Plot Delta ~ N(0, sd) if parameter is random effects sd
   if (param == "sigma") {
@@ -66,10 +67,10 @@ plot_prior_density <- function(
     )
     prior_samples <- rnorm(nsamples, mean = 0, sd = prior_samples)
     if (type == "density") {
-      p2 <- .plot_samples_density(prior_samples, interval_widths, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width = NA)
+      p2 <- .plot_samples_density(prior_samples, interval_widths, interval_colors, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width = NA)
     } 
     if (type == "dots") {
-      p2 <- .plot_samples_dots(prior_samples, ndots, point_interval, interval_widths, interval_colors, na_color, subtitle_width = NA) 
+      p2 <- .plot_samples_dots(prior_samples, quantiles, point_interval, interval_widths, interval_colors, na_color, subtitle_width = NA) 
     }
     plots$random_intercept <- p2 + labs(x = latex2exp::TeX("\\Delta"), title =  latex2exp::TeX("\\Delta ~ Normal(0, \\sigma)"))
     message("sd prior converted to random intercept as RI ~ N(0, sd)")
@@ -81,10 +82,10 @@ plot_prior_density <- function(
     prior_samples <- .backtransform(prior_samples, inv_link)
     xlab <- if (param == "sigma") paste0(inv_link, "(\\Delta)") else xlab <- paste0(inv_link, "(\\", param, ")")
     if (type == "density") {
-      p3 <- .plot_samples_density(prior_samples, interval_widths, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width = NA)
+      p3 <- .plot_samples_density(prior_samples, interval_widths, interval_colors, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width = NA)
     } 
     if (type == "dots") {
-      p3 <- .plot_samples_dots(prior_samples, ndots, point_interval, interval_widths, interval_colors, na_color, subtitle_width = NA) 
+      p3 <- .plot_samples_dots(prior_samples, quantiles, point_interval, interval_widths, interval_colors, na_color, subtitle_width = NA) 
     }
     plots$backtransformed <- p3 + 
     labs(x = latex2exp::TeX(xlab)) 
@@ -95,7 +96,6 @@ plot_prior_density <- function(
     plots <- plots |> 
       patchwork::wrap_plots(ncol = 1)
   }
-  browser()
   return(plots)
 }
 
@@ -118,7 +118,7 @@ plot_prior_density <- function(
 }
 
 
-.plot_samples_density <- function(prior_samples, hdci_width, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width) {
+.plot_samples_density <- function(prior_samples, hdci_width, interval_colors, cutoff_hdci, max_kde_n, min_kde_n, hdci_table, subtitle_width) {
 
   # Exclude HDCI widths greater than the cutoff
   hdci_width <- hdci_width[hdci_width <= cutoff_hdci]
@@ -173,7 +173,7 @@ plot_prior_density <- function(
   p <- ggplot2::ggplot() + 
     ggplot2::geom_area(ggplot2::aes(x, y, fill = HDCI), data = data_hdci, position = "identity") + 
     ggplot2::geom_line(ggplot2::aes(x, y), data = data) + 
-    ggplot2::scale_fill_manual(values = ggsci::pal_d3()(length(hdci_width)))
+    ggplot2::scale_fill_manual(values = interval_colors)
 
   # Add subtitle to plot
   subtitle_bounds <- if (cutoff_hdci >= 1) "" else paste0("The density is estimated only for values within the ", cutoff_hdci*100, "% HDCI.")
@@ -192,7 +192,7 @@ plot_prior_density <- function(
   return(p)
 }
 
-.plot_samples_dots <- function(samples, ndots, point_interval, interval_widths, interval_colors, na_color, subtitle_width) {
+.plot_samples_dots <- function(samples, quantiles, point_interval, interval_widths, interval_colors, na_color, subtitle_width) {
   # NOTE: ggdist seems to be unreliable in its point calculations, e.g. 
   # set.seed(710); mode_hdci(exp(rnorm(1e5, 0, rexp(1e5, 2)))
   if (str_detect(point_interval, "mode")) warning("ggdist mode calculations are sometimes suspect and or fail to calculate altogether; beware.")
@@ -216,19 +216,19 @@ plot_prior_density <- function(
         slab_fill = after_stat(level), 
         slab_color = after_stat(level), 
       ), 
-      quantiles = ndots, 
+      quantiles = quantiles, 
       point_interval = point_interval, 
       .width = interval_widths, 
       layout = "bin"
     ) + 
     scale_fill_manual(
       values = interval_colors, na.value = na_color, aesthetics = c("slab_fill", "slab_color")
-    ) +
+    ) + 
     # scale_color_manual(
     #   values = interval_colors, na.value = na_color, aesthetics = "slab_color"
     # ) +
     labs(
-      x = paste0("Prior samples (n =", ndots, ")"),
+      x = paste0("Prior samples (n =", quantiles, ")"),
       y = "Density",
       slab_fill = "HDCI", slab_color = "HDCI",
       subtitle = if(!(is.na(subtitle_width) || is.null(subtitle_width))) stringr::str_wrap(sub, subtitle_width) else waiver()
@@ -245,7 +245,7 @@ plot_prior_density <- function(
     str_extract("^\\w+") |>  # e.g. N(0, 1) -> N
     str_to_lower()
   rfunc <- names(which(sapply(dists, function(x) distr %in% tolower(x)))) # e.g. N -> rnorm
-  if (nchar(rfunc) == 0) stop(paste0("prior_def must be one of [", paste(unlist(unlist(dists)), collapse = ", "), "]. Add distributions in .supported_prior_distributions()"))
+  if (length(rfunc) == 0) stop(paste0("prior_def must be one of [", paste(unlist(unlist(dists)), collapse = ", "), "]. Add distributions in .supported_prior_distributions()"))
   args <- prior_def |> str_to_lower() |> 
     str_remove(distr) |> str_remove("\\(") |> str_remove("\\)") |> 
     str_split_1(",") |> str_trim()
