@@ -8,7 +8,7 @@ plot_prior_density <- function(
   truncate_lower = NULL,
   link = "identity",    # Link function for paramater; if supplied, samples are backtransformed using the inverse link function
   type = c("density", "dots"), # Plot type
-  interval_widths = c(0.5, 0.86, 0.98),   # Interval widths to plot (HDCI for 'density'; defined by point_interval for 'dots')
+  interval_widths = c(0.1, 0.5, 0.86, 0.98),   # Interval widths to plot (HDCI for 'density'; defined by point_interval for 'dots')
   interval_colors = NULL, 
   cutoff_hdci = 0.999,  # type == density: Density is not estimated for prior values outside the cutoff_hdci HDCI e.g. 0.999 HDCI
   max_kde_n = 1e6,      # type == density: Max number of grid cells at which to estimate the density
