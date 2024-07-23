@@ -17,7 +17,7 @@ plot_prior_density <- function(
   quantiles = 100,          # type == dots: Number of dots to plot (sets ggdist::stat_dotsinterval quantiles argument)
   point_interval = "median_hdci", # type == dots: 
   na_color = "#676769", # type == dots: color of quantiles outside the given interval widths
-  nsamples = 1e5,       # Number of samples over which density and HDCIs are calculated
+  nsamples = 1e6,       # Number of samples over which density and HDCIs are calculated
   patched = TRUE,       # Whether to patch plots together when multiple are produced
   subtitle_width = 80,  # Number of characters after which the subtitle is wrapped to the next line
   adjust_margin = FALSE, # Try to fix the top margin of the plot if subtitle is not fully shown, 
